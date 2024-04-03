@@ -1,0 +1,9 @@
+{
+  "domain": "harvia_sauna",
+  "name": "Harvia Sauna",
+  "version": "0.1.0",
+  "documentation": "https://www.rubenharms.nl",
+  "dependencies": [],
+  "codeowners": ["@rubenharms"],
+  "requirements": ["boto3==1.34.69", "pycognito==2024.2.0", "websockets==12.0"]
+}
