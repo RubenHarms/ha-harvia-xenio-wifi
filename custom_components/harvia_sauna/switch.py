@@ -1,16 +1,13 @@
 from homeassistant.components.switch import SwitchEntity
-import logging
-
-
-_LOGGER = logging.getLogger('custom_component.harvia_sauna')
-DOMAIN = "harvia_sauna"
+from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER
 
 class HarviaPowerSwitch(SwitchEntity):
-    def __init__(self, device, name):
+    def __init__(self, device, name, sauna):
         self._device = device
         self._name = name + ' schakelaar'
         self._is_on = device.active
         self._device_id = device.id + '_power'
+        self._sauna = sauna
 
     @property
     def name(self):
@@ -26,6 +23,13 @@ class HarviaPowerSwitch(SwitchEntity):
         """Return een unieke ID."""
         return self._device_id
 
+    async def async_added_to_hass(self):
+        """Acties die uitgevoerd moeten worden als entiteit aan HA is toegevoegd."""
+        self._sauna.powerSwitch = self
+        await self._device.update_ha_devices()
+
+    async def update_state(self):
+        self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs):
         # Code om de sauna aan te zetten
@@ -39,12 +43,21 @@ class HarviaPowerSwitch(SwitchEntity):
 
 
 class HarviaLightSwitch(SwitchEntity):
-    def __init__(self, device, name):
+    def __init__(self, device, name, sauna):
         self._device = device
         self._name = name + ' lichtschakelaar'
         self._is_on = device.lightsOn
         self._device_id = device.id + '_light'
+        self._sauna = sauna
 
+    async def async_added_to_hass(self):
+        """Acties die uitgevoerd moeten worden als entiteit aan HA is toegevoegd."""
+        self._device.lightSwitch = self
+        await self._device.update_ha_devices()
+        #self._device.
+
+    async def update_state(self):
+        self.async_write_ha_state()
 
     @property
     def name(self):
