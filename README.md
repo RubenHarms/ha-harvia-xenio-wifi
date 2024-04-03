@@ -1,6 +1,6 @@
 # Harvia Sauna
 
-Home Assistant component for Harva Sauna (working with Xenio Wifi), using the same API as the MyHarvia App.
+Home Assistant component for Harvia Sauna (working with Xenio Wifi), using the same API as the MyHarvia App.
 
 
 ## WARNING: Pre-alpha development release
@@ -48,7 +48,7 @@ Restart Homeassistant
 
 ## Known issues
 
-- Switches and climate entities stops working after one hour, due token expiry. Token renewal will be implementeren soon. Workaround: Restart HA.
+- Switches and climate entities stops working after one hour, due token expiry. Token renewal will be implemented soon. Workaround: Restart HA.
 
 <!-- ## Contribute
 
