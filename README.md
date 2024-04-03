@@ -46,6 +46,10 @@ harvia_password: yourPassword
 Your username and password is corresponding with the MyHarvia app.
 Restart Homeassistant 
 
+## Known issues
+
+- Switches and climate entities stops working after one hour, due token expiry. Token renewal will be implementeren soon. Workaround: Restart HA.
+
 ## Contribute
 
 Please do! Open a Pull Request with your improvements.
