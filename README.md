@@ -1,16 +1,26 @@
-# ha-harvia-xenio-wifi
+# Harvia Sauna
+
 Home Assistant component for Harva Sauna (working with Xenio Wifi), using the same API as the MyHarvia App.
 
-Add the following code to configuration.yaml
 
-# Compatibility
+## In development
+
+Component is in development and currently only publishes:
+
+- Sauna light switch
+- Sauna power switch (enables heater)
+- Sauna termostat (only target temp)
+
+## Compatibility
 Component has been tested with the Harvia Xenio Wifi (CX001WIFI) and Harvia Cilindro PC90XE, but may also work with other sauna's compatible with the MyHarvia app, as it uses the same API.
 
-# Installation
+## Installation
 
-Add repository https://github.com/RubenHarms/ha-harvia-xenio-wifi.git/ to HACS
+Add a custom repository https://github.com/RubenHarms/ha-harvia-xenio-wifi.git/ to HACS and search for Harvia Sauna to install.
 
-# Configuration
+## Configuration
+
+Add the following code to configuration.yaml
 
 ```yml
 harvia_sauna:
@@ -31,3 +41,7 @@ harvia_password: yourPassword
 
 Your username and password is corresponding with the MyHarvia app.
 Restart Homeassistant 
+
+## Contribute
+
+Please do! Open a Pull Request with your improvements.
