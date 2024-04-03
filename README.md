@@ -50,6 +50,6 @@ Restart Homeassistant
 
 - Switches and climate entities stops working after one hour, due token expiry. Token renewal will be implementeren soon. Workaround: Restart HA.
 
-## Contribute
+<!-- ## Contribute
 
-Please do! Open a Pull Request with your improvements.
+Please do! Open a Pull Request with your improvements. -->
