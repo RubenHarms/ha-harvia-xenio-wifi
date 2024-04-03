@@ -3,7 +3,11 @@
 Home Assistant component for Harva Sauna (working with Xenio Wifi), using the same API as the MyHarvia App.
 
 
-## In development
+## WARNING: Pre-alpha development release
+
+*This component is still in 'pre-alpha' and can exhibit unpredictable behavior.  I am happy that I have already achieved this result.  The biggest bug fixes will be fixed in the coming days so it's mostly stable.  Keep an eye on this page.* 
+
+(updated at April 3, 2024)
 
 Component is in development and currently only publishes:
 
