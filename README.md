@@ -46,9 +46,10 @@ Restart Homeassistant
 
 - You dont't get any message when the door of your sauna is open and you can't start the heater. 
 
+<!--
 ## Known issues
 
-- Connection interruption ensures that no new sauna updates are received as no 'reconnect' mechanism has yet been created for web sockets. You need to restart HA in order to reset the component.
+- Connection interruption ensures that no new sauna updates are received as no 'reconnect' mechanism has yet been created for web sockets. You need to restart HA in order to reset the component. -->
 
 ## Road map (short term)
 
