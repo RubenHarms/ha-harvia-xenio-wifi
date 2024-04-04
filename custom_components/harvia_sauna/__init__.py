@@ -32,10 +32,15 @@ class HarviaDevice:
     def __init__(self, sauna: HarviaSauna, id: str):
         self.sauna = sauna
         self.data = {}
+        self.user  = None
         self.id = id
         self.active = False
         self.lightsOn = False
+        self.steamOn = False
         self.targetTemp = None
+        self.currentTemp = None
+        self.humidity = None
+        self.remainingTime = None
         self.heatUpTime = 0
         self.targetRh = 0
         self.onTime = 0
@@ -46,10 +51,13 @@ class HarviaDevice:
         self.thermostat = None
         self.switches = None
         self.thermostats = None
+        self.lastestUpdate = None
+        self.websockDevice = None
+        self.websockData = None
 
     async def update_data(self, data: dict):
         self.data = data
-        
+
         _LOGGER.debug(f"Performing device update: " + json.dumps(data))
 
         if 'displayName' in data:
@@ -57,16 +65,29 @@ class HarviaDevice:
         if 'active' in data:
             self.active = bool(data['active'])
         if 'light' in data:
-            self.lightsOn = bool(data['light'])        
+            self.lightsOn = bool(data['light'])
         if 'fanOn' in data:
-            self.fanOn = bool(data['fanOn'])        
+            self.fanOn = bool(data['fanOn'])
+        if 'steamOn' in data:
+            self.fanOn = bool(data['steamOn'])
+        if 'heatOn' in data:
+            self.actvie = data['heatOn']
         if 'targetTemp' in data:
             self.targetTemp = data['targetTemp']
         if 'targetRh' in data:
             self.targetRh = data['targetRh']
         if 'heatUpTime' in data:
             self.heatUpTime = data['heatUpTime']
-    
+        if 'remainingTime' in data:
+            self.remainingTime = data['remainingTime']
+        if 'temperature' in data:
+            self.currentTemp = data['temperature']
+        if 'humidity' in data:
+            self.humidity = data['humidity']
+        if 'timestamp' in data:
+            self.lastestUpdate = data['timestamp']
+
+
         await self.dump_data()
         await self.update_ha_devices()
 
@@ -78,9 +99,11 @@ class HarviaDevice:
         if self.powerSwitch is not None:
             self.powerSwitch._is_on = self.active
             await self.powerSwitch.update_state()
-        
+
         if self.thermostat is not None:
             self.thermostat._target_temperature = self.targetTemp
+            self.thermostat._current_temperature = self.currentTemp
+
             if self.active == True:
                 self.thermostat._hvac_mode = HVAC_MODE_HEAT
             else:
@@ -111,17 +134,18 @@ class HarviaDevice:
         _LOGGER.debug(f"Device attributen: {attributes_as_string}")
 
 
-    async def get_thermostats(self) -> list: 
+    async def get_thermostats(self) -> list:
         if self.switches != None:
             return self.switches
 
         self.thermostats = []
+
         thermostat = HarviaThermostat(device=self, name=self.name, sauna=self.sauna)
         self.thermostats.append(thermostat)
 
         return self.thermostats
 
-    async def get_switches(self) -> list: 
+    async def get_switches(self) -> list:
         if self.switches != None:
             return self.switches
 
@@ -132,7 +156,7 @@ class HarviaDevice:
 
         self.switches.append(powerSwitch)
         self.switches.append(lightSwitch)
-        
+
         return self.switches
 
 class HarviaWebsock:
@@ -157,7 +181,7 @@ class HarviaWebsock:
         url = await self.sauna.websock_get_url(self.endpoint)
         payload = {'type': 'connection_init'}
         _LOGGER.debug(f"wssUrl: {url}")
-        
+
         async with websockets.connect(url,  subprotocols=["graphql-ws"],) as self.websocket:
             await self.websocket.send(json.dumps(payload))
 
@@ -170,12 +194,12 @@ class HarviaWebsock:
                     break
 
     async def create_subscription(self):
-        
-        id_token = await self.sauna.get_id_token()    
-        
+
+        id_token = await self.sauna.get_id_token()
+
         data = ""
         if self.endpoint == 'data':
-            data =  await self.create_data_subscription_message()               
+            data =  await self.create_data_subscription_message()
         elif self.endpoint == 'device':
             data =  await self.create_device_subscription_message()
 
@@ -195,44 +219,41 @@ class HarviaWebsock:
                     }
 
         message = json.dumps(payload)
-        _LOGGER.debug(f"Websock send subscription: {message}")
+        _LOGGER.debug(f"Websock "+self.endpoint+ f" send subscription: {message}")
 
         await self.websocket.send(message)
 
-    async def create_data_subscription_message(self) -> str:        
-        return '"{\"query\":\"subscription Subscription($receiver: String!) {\\n  onDataUpdates(receiver: $receiver) {\\n    item {\\n      deviceId\\n      timestamp\\n      sessionId\\n      type\\n      data\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\"postbus@rubenharms.nl\"}}"'
+    async def create_data_subscription_message(self) -> str:
+        userData = await self.sauna.get_user_data()
+        organizationId = userData["organizationId"]
+        return "{\"query\":\"subscription Subscription($receiver: String!) {\\n  onDataUpdates(receiver: $receiver) {\\n    item {\\n      deviceId\\n      timestamp\\n      sessionId\\n      type\\n      data\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\""+organizationId+"\"}}"
 
-    async def create_device_subscription_message(self) -> str:        
-        return '{\"query\":\"subscription Subscription($receiver: String!) {\\n  onStateUpdated(receiver: $receiver) {\\n    desired\\n    reported\\n    timestamp\\n    receiver\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\"5b53af61-8f6a-4fc5-ba12-d33af78dbac3\"}}'
+    async def create_device_subscription_message(self) -> str:
+        userData = await self.sauna.get_user_data()
+        organizationId = userData["organizationId"]
+        return "{\"query\":\"subscription Subscription($receiver: String!) {\\n  onStateUpdated(receiver: $receiver) {\\n    desired\\n    reported\\n    timestamp\\n    receiver\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\""+organizationId+"\"}}"
 
     async def handle_message(self, message):
         """Verwerk en reageer op het ontvangen bericht."""
 
-        _LOGGER.debug("Websock received message: " + message)
+        _LOGGER.debug("Websock " + self.endpoint +  " - received message: " + message)
         data = json.loads(message)  # Veronderstelt dat het bericht in JSON-formaat is
         # Voorbeeld: controleer of het bericht een specifiek type of inhoud heeft
         if data.get("type") == "ka":
-            _LOGGER.debug("Websock  Hartslag ontvangen.")
+            _LOGGER.debug("Websock  " + self.endpoint +  " Hartslag ontvangen.")
         elif data.get('type') == 'connection_ack':
             _LOGGER.debug("Websock connection_ack ontvangen")
             if data.get('payload'):
                 self.timeout = data['payload']['connectionTimeoutMs']/1000
             await self.create_subscription()
         elif data.get("type") == "data":
-
             if self.endpoint == 'device':
                 await self.sauna.process_device_update(data)
-            _LOGGER.debug("Websock Actie vereist: " + message)
-            # Voer een specifieke actie uit op basis van het bericht
-            # Bijvoorbeeld, een functie aanroepen:
-            await self.perform_action(data.get("action"))
+            elif self.endpoint == 'data':
+                await self.sauna.process_device_update(data)
+            _LOGGER.debug("Websock " + self.endpoint +  " Actie vereist: " + message)
         else:
-            _LOGGER.debug("Onbekend berichttype ontvangen: " + message)
-
-    async def perform_action(self,action):
-        """Voer een specifieke actie uit."""
-        print(f"Actie uitvoeren: {action}")
-        # Implementeer de actielogica hier, afhankelijk van wat nodig is voor je applicatie
+            _LOGGER.debug("Onbekend berichttype " + self.endpoint +  " ontvangen: " + message)
 
     async def receive_message(self,websocket):
         """Wacht op een bericht met een maximale duur."""
@@ -251,7 +272,8 @@ class HarviaSauna:
         self.storage = storage
         self.config = config
         self.data = {}
-        self.devices = []
+        self.devices = None
+        self.user_data = None
         self.cognito = None
 
     async def async_setup(self, config: dict) -> bool:
@@ -268,11 +290,6 @@ class HarviaSauna:
         self.hass.data[DOMAIN] = harvia_config
 
         await self.update_devices()
-    
-        #client = await self.get_client()
-
-        #data_string = json.dumps(self.data, indent=4)
-        #_LOGGER.debug(f"Tokens data: {data_string}")
         await self.websocket_init()
 
         self.hass.data[DOMAIN]['api'] = self
@@ -281,19 +298,41 @@ class HarviaSauna:
         return True
 
     async def get_device(self, deviceId: str) -> dict:
-        headers = await self.get_headers()   
+        headers = await self.get_headers()
 
         data_string = json.dumps(headers, indent=4)
         device_query = { "operationName": "Query", "variables": {  "deviceId": deviceId  },      "query": "query Query($deviceId: ID!) {\n  getDeviceState(deviceId: $deviceId) {\n    desired\n    reported\n    timestamp\n    __typename\n  }\n}\n"}
         session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-
         url = self.data['endpoints']['device']['endpoint']
         async with session.post(url, json=device_query, headers=headers) as response:
             deviceResp = await response.json()
             data_string = json.dumps(deviceResp, indent=4)
             _LOGGER.debug(f"Ontvangen data: {data_string}")
             deviceData = json.loads(deviceResp['data']['getDeviceState']['reported'])
-        
+
+        return deviceData
+
+    async def get_latest_device_data(self, deviceId: str) -> dict:
+        headers = await self.get_headers()
+        data_string = json.dumps(headers, indent=4)
+        data_query ={
+                        "operationName": "Query",
+                        "variables": {
+                            "deviceId": deviceId
+                        },
+                        "query": "query Query($deviceId: String!) {\n  getLatestData(deviceId: $deviceId) {\n    deviceId\n    timestamp\n    sessionId\n    type\n    data\n    __typename\n  }\n}\n"
+                    }
+        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        url = self.data['endpoints']['data']['endpoint']
+        async with session.post(url, json=data_query, headers=headers) as response:
+            deviceResp = await response.json()
+            data_string = json.dumps(deviceResp, indent=4)
+            _LOGGER.debug(f"Ontvangen data: {data_string}")
+            deviceData = json.loads(deviceResp['data']['getLatestData']['data'])
+
+            deviceData['timestamp'] = deviceResp['data']['getLatestData']['timestamp']
+            deviceData['type'] = deviceResp['data']['getLatestData']['type']
+
         return deviceData
 
     async def get_headers(self) -> dict:
@@ -304,15 +343,16 @@ class HarviaSauna:
         return headers
 
     async def get_devices(self) -> list:
-        await self.update_devices()
+        if self.devices is None:
+            await self.update_devices()
         return self.devices
 
 
     async def update_devices(self):
 
         self.devices = []
-        headers = await self.get_headers()   
 
+        headers = await self.get_headers()
         device_data= {
         "operationName": "Query",
         "variables": {},
@@ -323,6 +363,7 @@ class HarviaSauna:
 
         url = self.data['endpoints']['device']['endpoint']
         async with session.post(url, json=device_data, headers=headers) as response:
+            self.devices = []
             deviceTree = await response.json()
             data_string = json.dumps(deviceTree, indent=4)
             _LOGGER.debug(f"Ontvangen data: {data_string}")
@@ -338,10 +379,14 @@ class HarviaSauna:
                     _LOGGER.debug(f"Devices: {data_string}")
                     devices = devicesTreeData[0]['c']
                     for device in devices:
-                        deviceId = device['i']['name']                        
+                        deviceId = device['i']['name']
+
                         deviceData = await self.get_device(deviceId)
+                        latestDeviceData = await self.get_latest_device_data(deviceId)
                         deviceObject  = HarviaDevice(sauna=self, id=deviceId)
+
                         await deviceObject.update_data(deviceData)
+                        await deviceObject.update_data(latestDeviceData)
                         self.devices.append(deviceObject)
 
 
@@ -351,35 +396,57 @@ class HarviaSauna:
             else:
                 _LOGGER.error("Onverwachte structuur van de response: 'data' of 'getDeviceTree' niet gevonden.")
 
-    async def get_id_token(self) -> str:        
+    async def check_and_renew_token(self):
         client = await self.get_client()
 
+        current_id_token = self.data['token_data']['id_token']
+        await self.hass.async_add_executor_job(
+            lambda: client.check_token(renew=True)
+        )
+        self.data["token_data"] = {
+            "access_token": client.access_token,
+            "refresh_token": client.refresh_token,
+            "id_token": client.id_token,
+        }
+
+        if current_id_token != client.id_token:
+            _LOGGER.debug(f"Token renewed! {current_id_token} != {client.id_token}")
+
+
+    async def get_id_token(self) -> str:
+        await self.check_and_renew_token()
         return self.data['token_data']['id_token']
 
     async def process_device_update(self, message: dict):
 
-        _LOGGER.error("Device update process: " + json.dumps(message))
+        _LOGGER.debug("Device update process: " + json.dumps(message))
 
-                #{"id":"5ae58e56-d03a-4a7a-ab7d-9e8b308810a1","type":"data","payload":{"data":{"onStateUpdated":{"desired":null,"reported":"{\"active\":1,\"light\":0,\"fan\":0,\"steamEn\":0,\"targetTemp\":90,\"targetRh\":50,\"heatUpTime\":37,\"tz\":\"UTC+1 dst\",\"onTime\":360,\"dehumEn\":0,\"autoLight\":0,\"tempUnit\":0,\"timedStart\":\"ARhaABxEDGY=\",\"displayName\":\"Sauna boven\",\"cmd\":\"\",\"autoFan\":0,\"aromaEn\":0,\"aromaLevel\":0,\"wClkEn\":0,\"wClk\":\"\",\"deviceId\":\"e0b84f32-9eb0-4add-aad5-8d50886b3a66\",\"otaId\":\"\",\"__typename\":\"SAUNA\"}","timestamp":1712078650,"receiver":"5b53af61-8f6a-4fc5-ba12-d33af78dbac3","__typename":"StateResponse"}}}}
+
         if message.get('type') != 'data':
             return
-        if 'onStateUpdated' not in message['payload']['data']:
+        if 'onStateUpdated' in message['payload']['data']:
+            #{"id":"5ae58e56-d03a-4a7a-ab7d-9e8b308810a1","type":"data","payload":{"data":{"onStateUpdated":{"desired":null,"reported":"{\"active\":1,\"light\":0,\"fan\":0,\"steamEn\":0,\"targetTemp\":90,\"targetRh\":50,\"heatUpTime\":37,\"tz\":\"UTC+1 dst\",\"onTime\":360,\"dehumEn\":0,\"autoLight\":0,\"tempUnit\":0,\"timedStart\":\"ARhaABxEDGY=\",\"displayName\":\"Sauna boven\",\"cmd\":\"\",\"autoFan\":0,\"aromaEn\":0,\"aromaLevel\":0,\"wClkEn\":0,\"wClk\":\"\",\"deviceId\":\"e0b84f32-9eb0-4add-aad5-8d50886b3a66\",\"otaId\":\"\",\"__typename\":\"SAUNA\"}","timestamp":1712078650,"receiver":"5b53af61-8f6a-4fc5-ba12-d33af78dbac3","__typename":"StateResponse"}}}}
+            data = json.loads(message['payload']['data']['onStateUpdated']['reported'])
+            deviceId = data['deviceId']
+        elif 'onDataUpdates' in message['payload']['data']:
+            #{ "id": "898df439-408e-4d35-b7c6-9a5bc6d69e81", "type": "data", "payload": { "data": { "onDataUpdates": { "item": { "deviceId": "e0b84f32-9eb0-4add-aad5-8d50886b3a66", "timestamp": "1712161222726", "sessionId": "1", "type": "sauna", "data": "{\"targetTemp\":90,\"ph2RelayCounterLT\":0,\"remainingTime\":357,\"steamOn\":false,\"temperature\":27,\"humidity\":0,\"heatOn\":true,\"steamOnCounterLT\":0,\"steamOnCounter\":0,\"heatOnCounterLT\":0,\"heatOnCounter\":0,\"ph1RelayCounterLT\":1,\"ph3RelayCounterLT\":0,\"ph1RelayCounter\":1,\"ph3RelayCounter\":0,\"wifiRSSI\":-68,\"testVar1\":0,\"testVar2\":0,\"ph2RelayCounter\":0}", "__typename": "DataItem" }, "__typename": "UpdatedData" } } } }
+            data = json.loads(message['payload']['data']['onDataUpdates']['item']['data'])
+            data['timestamp'] = message['payload']['data']['onDataUpdates']['item']['timestamp']
+            data['type'] = message['payload']['data']['onDataUpdates']['item']
+            deviceId =  message['payload']['data']['onDataUpdates']['item']['deviceId']
+        else:
             return
-        reported = json.loads(message['payload']['data']['onStateUpdated']['reported'])
-        deviceId = reported['deviceId']
 
         for device in self.devices:
             if device.id != deviceId:
                 continue
-            await device.update_data(reported)
-
-
+            await device.update_data(data)
 
     async def device_mutation(self, deviceId: str, payload: str):
 
         payloadString =  json.dumps(payload, indent=4)
 
-        headers = await self.get_headers()   
+        headers = await self.get_headers()
         query = {   "operationName": "Mutation",
                     "variables": {
                     "deviceId": deviceId,
@@ -396,18 +463,18 @@ class HarviaSauna:
             response = await response.json()
             responseString = json.dumps(response, indent=4)
             _LOGGER.debug(f"Device mutation: {responseString}")
-        
+
     async def get_client(self) -> Cognito:
         if self.cognito == None:
             await self.authenticate_and_save_tokens()
 
 
-        return self.cognito    
+        return self.cognito
 
     async def fetch_and_save_endpoints(self):
         """Haalt endpoints op en slaat deze op als ze nog niet bestaan."""
         _LOGGER.debug("Fetching and saving endpoints.")
-        
+
         if "endpoints" not in self.data:
             self.data['endpoints'] = {}
             session = self.hass.helpers.aiohttp_client.async_get_clientsession()
@@ -432,10 +499,10 @@ class HarviaSauna:
         regex = r"^https:\/\/(.+)\.appsync-api\.(.+)\/graphql$"
         regexReplace = r"wss://\1.appsync-realtime-api.\2/graphql"
         regexReplaceHost = r"\1.appsync-api.\2"
- 
+
         wssUrl = re.sub(regex, regexReplace, user_endpoint)
         host = re.sub(regex, regexReplaceHost, user_endpoint)
-    
+
         return { 'wssUrl': wssUrl, 'host': host}
 
     async def websock_get_url(self, endpoint) -> str:
@@ -452,28 +519,44 @@ class HarviaSauna:
         encoded_header = base64.b64encode(data_string.encode())
         _LOGGER.debug(f"Encoded data: {encoded_header}")
 
-
-        #    headerJson = json.dumps(headerPayload, indent=4)
-        #       _LOGGER.debug(f"Websock header: {headerJson}")
-        #      encoded_header = base64.b64encode(header_json.encode())
-        #      _LOGGER.debug(f"Websock base64 header: {headerJson}")
-
         wssUrl = websockEndpoint['wssUrl']+ '?header='+ quote(encoded_header)+'&payload=e30='
         return wssUrl
 
 
     async def websocket_init(self):
-        sock = HarviaWebsock(self, 'device')
-        #sock = HarviaWebsock(self, 'data')
+        self.websockDevice = HarviaWebsock(self, 'device')
+        await self.websockDevice.connect()
 
-        await sock.connect()
+        self.websockData = HarviaWebsock(self, 'data')
+        await self.websockData.connect()
+
+    async def get_user_data(self):
+        if self.user_data is not None:
+            return self.user_data
+        headers = await self.get_headers()
+
+        user_query= {
+        "operationName": "Query",
+        "variables": {},
+        "query": "query Query {\n  getCurrentUserDetails {\n    email\n    organizationId\n    admin\n    given_name\n    family_name\n    superAdmin\n    rdUser\n    appSettings\n    __typename\n  }\n}\n"
+        }
+
+        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        url = self.data['endpoints']['users']['endpoint']
+        async with session.post(url, json=user_query, headers=headers) as response:
+            user_data = await response.json()
+            data_string = json.dumps(user_data, indent=4)
+            _LOGGER.debug(f"User data: {data_string}")
+
+            self.user_data = user_data['data']['getCurrentUserDetails']
+            return  self.user_data
+
 
     async def authenticate_and_save_tokens(self):
         """Authenticateert met de service en slaat de tokens op."""
         _LOGGER.debug("Authenticating and saving tokens.")
 
-        await self.fetch_and_save_endpoints()        
-
+        await self.fetch_and_save_endpoints()
         user_pool_id = self.data["endpoints"]["users"]["userPoolId"]
         client_id = self.data["endpoints"]["users"]["clientId"]
         id_token = self.data["endpoints"]["users"]["identityPoolId"]
@@ -485,50 +568,28 @@ class HarviaSauna:
         u = await self.hass.async_add_executor_job(
             lambda: Cognito(user_pool_id, client_id, username=username, user_pool_region=REGION, id_token=id_token)
         )
-
-
+        self.cognito = u
 
         _LOGGER.debug("Using username: " + username + ' - with password:"'+password+ "'")
 
-
-
         await self.hass.async_add_executor_job(
+
             lambda: u.authenticate(password=password)
         )
-        
+
         self.data["token_data"] = {
             "access_token": u.access_token,
             "refresh_token": u.refresh_token,
             "id_token": u.id_token,
         }
-
 
         data_string = json.dumps( self.data["token_data"], indent=4)
-        _LOGGER.debug(f"Token data: {data_string}")
-
-        #await self.hass.async_add_executor_job(u.authenticate, password)
-
-        _LOGGER.debug("Refresh token.")
-
-
-        await self.hass.async_add_executor_job(
-            lambda: u.check_token(renew=True)
-        )
-
-        self.data["token_data"] = {
-            "access_token": u.access_token,
-            "refresh_token": u.refresh_token,
-            "id_token": u.id_token,
-        }
+        await self.check_and_renew_token()
         await self.storage.async_save(self.data)
         _LOGGER.info("Authentication successful, tokens saved.")
 
-
-
         data_string = json.dumps( self.data["token_data"], indent=4)
         _LOGGER.debug(f"Token data: {data_string}")
-
-        self.cognito = u
 
         self.hass.data[DOMAIN]["token_data"] = self.data["token_data"]
 

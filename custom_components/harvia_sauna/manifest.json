@@ -1,7 +1,7 @@
 {
   "domain": "harvia_sauna",
   "name": "Harvia Sauna",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "documentation": "https://github.com/RubenHarms/ha-harvia-xenio-wifi/blob/main/README.md",
   "issue_tracker": "https://github.com/RubenHarms/ha-harvia-xenio-wifi/issues",
   "dependencies": [],

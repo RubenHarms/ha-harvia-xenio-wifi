@@ -4,10 +4,13 @@ from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER
 class HarviaPowerSwitch(SwitchEntity):
     def __init__(self, device, name, sauna):
         self._device = device
-        self._name = name + ' schakelaar'
+        self._name = name + ' Power switch'
         self._is_on = device.active
         self._device_id = device.id + '_power'
         self._sauna = sauna
+        self._attr_unique_id = device.id + '_power'
+        self._attr_icon = 'mdi:heating-coil'
+
 
     @property
     def name(self):
@@ -17,6 +20,10 @@ class HarviaPowerSwitch(SwitchEntity):
     def is_on(self):
         return self._is_on
 
+    @property
+    def icon(self) -> str | None:
+        """Icon of the entity."""
+        return "mdi:heater"
 
     @property
     def unique_id(self):
@@ -42,13 +49,17 @@ class HarviaPowerSwitch(SwitchEntity):
         self._is_on = False
 
 
+
 class HarviaLightSwitch(SwitchEntity):
     def __init__(self, device, name, sauna):
         self._device = device
-        self._name = name + ' lichtschakelaar'
+        self._name = name + ' Light Switch'
         self._is_on = device.lightsOn
         self._device_id = device.id + '_light'
         self._sauna = sauna
+        self._attr_unique_id = device.id + '_light'
+        self._attr_icon = 'mdi:lightbulb-multiple'
+
 
     async def async_added_to_hass(self):
         """Acties die uitgevoerd moeten worden als entiteit aan HA is toegevoegd."""
