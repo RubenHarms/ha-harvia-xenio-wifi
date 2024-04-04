@@ -31,11 +31,6 @@ Add the following code to configuration.yaml
 harvia_sauna:
   username: "your@username.com"
   password: !secret harvia_password
-
-switch:
-  - platform: harvia_sauna
-climate:
-  - platform: harvia_sauna
 ```
 
 Add the following password to secrets.yml:
