@@ -53,12 +53,11 @@ Restart Homeassistant
 
 ## Known issues
 
-- Connection interruption ensures that no new sauna updates are received as no 'reconnect' mechanism has yet been created for web sockets. You need to restart HA in order to reset the component. 
-- Error that the switches are registered twice.
+- Connection interruption ensures that no new sauna updates are received as no 'reconnect' mechanism has yet been created for web sockets. You need to restart HA in order to reset the component.
 
 ## Road map (short term)
 
-For version 0.0.5: 
+For version 0.0.6: 
 
 - Creating reconnection machanism
 - Door sensor detection and feedback
