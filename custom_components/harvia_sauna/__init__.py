@@ -135,8 +135,8 @@ class HarviaDevice:
 
 
     async def get_thermostats(self) -> list:
-        if self.switches != None:
-            return self.switches
+        if self.thermostats != None:
+            return self.thermostats
 
         self.thermostats = []
 
