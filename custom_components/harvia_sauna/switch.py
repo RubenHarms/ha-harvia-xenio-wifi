@@ -1,5 +1,6 @@
 from homeassistant.components.switch import SwitchEntity
 from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER
+from homeassistant.components.climate.const import HVACMode
 
 class HarviaPowerSwitch(SwitchEntity):
     def __init__(self, device, name, sauna):
@@ -32,7 +33,7 @@ class HarviaPowerSwitch(SwitchEntity):
 
     async def async_added_to_hass(self):
         """Acties die uitgevoerd moeten worden als entiteit aan HA is toegevoegd."""
-        self._sauna.powerSwitch = self
+        self._device.powerSwitch = self
         await self._device.update_ha_devices()
 
     async def update_state(self):
@@ -40,15 +41,23 @@ class HarviaPowerSwitch(SwitchEntity):
 
     async def async_turn_on(self, **kwargs):
         # Code om de sauna aan te zetten
-        await self._device.set_active(True)
         self._is_on = True
+        self.async_write_ha_state()
+
+        await self._device.set_active(True)
+        if self._device.thermostat is not None:
+            self._device.thermostat._hvac_mode = HVACMode.HEAT
+            await self._device.thermostat.update_state()
 
     async def async_turn_off(self, **kwargs):
         # Code om de sauna uit te zetten
-        await self._device.set_active(False)
         self._is_on = False
+        self.async_write_ha_state()
 
-
+        await self._device.set_active(False)
+        if self._device.thermostat is not None:
+            self._device.thermostat._hvac_mode = HVACMode.OFF
+            await self._device.thermostat.update_state()
 
 class HarviaLightSwitch(SwitchEntity):
     def __init__(self, device, name, sauna):
@@ -94,7 +103,7 @@ class HarviaLightSwitch(SwitchEntity):
         await self._device.set_lights(False)
         self._is_on = False
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_entry(hass, entry, async_add_entities):
     """Set up de Harvia switches."""
     # Hier zou je de logica toevoegen om je apparaten op te halen.
     # Voor nu voegen we handmatig een schakelaar toe als voorbeeld.

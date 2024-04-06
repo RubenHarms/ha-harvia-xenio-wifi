@@ -1,0 +1,54 @@
+deviceId: Een unieke identifier voor het apparaat.
+active: Geeft aan of de sauna actief is (0 voor uit, waarschijnlijk 1 voor aan).
+light: Geeft de status van de verlichting aan (0 voor uit, 1 voor aan).
+fan: Geeft de status van de ventilator aan (0 voor uit, 1 voor aan).
+steamEn: Stoomfunctie ingeschakeld (0 voor uit, 1 voor aan).
+targetTemp: De doeltemperatuur voor de sauna (80 graden in dit geval).
+targetRh: De doelvochtigheid in percentage (50% in dit geval).
+heatUpTime: Verwachte opwarmtijd in minuten (37 minuten in dit geval).
+tz: Tijdzone van het apparaat (UTC+1 met daglichtbesparing ingeschakeld).
+onTime: De tijd in minuten dat de sauna aan is geweest.
+dehumEn: Ontvochtigingsfunctie ingeschakeld (0 voor uit, 1 voor aan).
+autoLight: Automatische verlichtingsfunctie ingeschakeld (0 voor uit, 1 voor aan).
+tempUnit: De eenheid van temperatuur (0 zou Celsius kunnen zijn).
+timedStart: Een gecodeerde waarde die waarschijnlijk de geplande starttijd van de sauna aangeeft.
+displayName: De naam die aan het apparaat is gegeven (hier "Sauna boven").
+cmd: Een commando of bericht verzonden naar of van het apparaat.
+autoFan: Automatische ventilatorfunctie ingeschakeld (0 voor uit, 1 voor aan).
+aromaEn: Aromatherapiefunctie ingeschakeld (0 voor uit, 1 voor aan).
+aromaLevel: Het niveau van aromatherapie.
+wClkEn: Wandklok functie ingeschakeld (0 voor uit, 1 voor aan).
+otaId: Een identificatie voor Over-The-Air updates.
+maxOnTime: Maximale tijd in minuten dat het apparaat aan kan blijven.
+errorCodes: Een waarde die aangeeft of er fouten zijn opgetreden.
+online: Geeft aan of het apparaat online is (true voor online).
+otaChecked: Tijdstempel van de laatste OTA-update check.
+maxTemp: Maximale temperatuurinstelling.
+serialNum: Serienummer van het apparaat.
+minTemp: Minimale temperatuurinstelling.
+msgId: Een identificatienummer voor het bericht of de opdracht.
+statusCodes: Een veld dat waarschijnlijk de huidige statuscodes van het apparaat aangeeft.
+hwVer: Hardwareversie.
+devType: Apparaattype.
+swVer: Softwareversie.
+hwProperties: Een waarde die hardware-eigenschappen aangeeft.
+macAddr: Het MAC-adres van het apparaat.
+expired: Geeft aan of een bepaalde status of licentie verlopen is (false voor niet verlopen).
+ph2RelayCounterLT: Een teller voor de fase 2-relais, mogelijk op lange termijn (LT staat waarschijnlijk voor Long Term).
+remainingTime: De resterende tijd in minuten of seconden voor een bepaalde operatie of toestand.
+steamOn: Geeft aan of de stoomfunctie is ingeschakeld (false betekent uit).
+temperature: De huidige gemeten temperatuur (23 graden in dit geval).
+humidity: De huidige gemeten vochtigheid (0 in dit geval, wat kan duiden op een fout of geen meting).
+heatOn: Geeft aan of de verwarming is ingeschakeld (false betekent uit).
+steamOnCounterLT: Een teller voor hoe vaak de stoomfunctie op lange termijn is ingeschakeld.
+steamOnCounter: Een teller voor hoe vaak de stoomfunctie is ingeschakeld (mogelijk voor een kortere periode dan LT).
+timestamp: Een tijdstempel die aangeeft wanneer de data is gegenereerd of voor het laatst is bijgewerkt. "LATEST" suggereert dat dit de meest recente data is.
+heatOnCounterLT: Een teller voor hoe vaak de verwarming op lange termijn is ingeschakeld.
+heatOnCounter: Een teller voor hoe vaak de verwarming is ingeschakeld (mogelijk voor een kortere periode dan LT).
+ph1RelayCounterLT: Een teller voor de fase 1-relais op lange termijn.
+ph3RelayCounterLT: Een teller voor de fase 3-relais op lange termijn.
+ph1RelayCounter: Een teller voor de fase 1-relais.
+ph3RelayCounter: Een teller voor de fase 3-relais.
+wifiRSSI: De signaalsterkte van de wifi-verbinding (RSSI staat voor Received Signal Strength Indicator, -73 dBm in dit geval, wat duidt op een matige tot goede verbinding).
+testVar1, testVar2: Testvariabelen, mogelijk gebruikt voor troubleshooting of tijdelijke metingen.
+ph2RelayCounter: Een teller voor de fase 2-relais.

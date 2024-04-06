@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to your Harvia Sauna",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "init": {
+        "title": "Connect to your Harvia Sauna",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect, please check your credentials.",
+      "invalid_auth": "Invalid authentication, please try again.",
+      "unknown": "An unknown error occurred."
+    },
+    "abort": {
+      "already_configured": "Device is already configured"
+    }
+  }
+}

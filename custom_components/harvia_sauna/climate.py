@@ -1,6 +1,6 @@
-from homeassistant.components.climate import ClimateEntity, HVAC_MODE_HEAT
-from homeassistant.components.climate.const import SUPPORT_TARGET_TEMPERATURE, HVAC_MODE_OFF
-from homeassistant.const import TEMP_CELSIUS, ATTR_TEMPERATURE
+from homeassistant.components.climate import ClimateEntity
+from homeassistant.components.climate.const import HVACMode, ClimateEntityFeature
+from homeassistant.const import ATTR_TEMPERATURE, UnitOfTemperature
 from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER
 
 class HarviaThermostat(ClimateEntity):
@@ -9,7 +9,7 @@ class HarviaThermostat(ClimateEntity):
         self._name = name + ' Thermostat'
         self._current_temperature = None
         self._target_temperature = None
-        self._hvac_mode = HVAC_MODE_OFF
+        self._hvac_mode = HVACMode.OFF
         self._device_id = device.id + '_termostat'
         self._sauna = sauna
         self._attr_unique_id = device.id + '_termostat'
@@ -28,7 +28,7 @@ class HarviaThermostat(ClimateEntity):
 
     @property
     def temperature_unit(self):
-        return TEMP_CELSIUS
+        return UnitOfTemperature.CELSIUS
 
     @property
     def current_temperature(self):
@@ -44,20 +44,7 @@ class HarviaThermostat(ClimateEntity):
 
     @property
     def hvac_modes(self):
-        return [HVAC_MODE_OFF, HVAC_MODE_HEAT]
-
-    @property
-    def supported_features(self):
-        return SUPPORT_TARGET_TEMPERATURE
-
-
-    async def async_turn_on(self, **kwargs):
-        # Code om de sauna aan te zetten
-        await self.async_set_hvac_mode(HVAC_MODE_HEAT)
-
-    async def async_turn_off(self, **kwargs):
-        # Code om de sauna uit te zetten
-        await self.async_set_hvac_mode(HVAC_MODE_OFF)
+        return [HVACMode.OFF, HVACMode.HEAT]
 
     async def async_added_to_hass(self):
         """Acties die uitgevoerd moeten worden als entiteit aan HA is toegevoegd."""
@@ -74,14 +61,24 @@ class HarviaThermostat(ClimateEntity):
 
     async def async_set_hvac_mode(self, hvac_mode):
         """Stel de HVAC-modus in."""
+        active = False
         self._hvac_mode = hvac_mode
-        if hvac_mode == HVAC_MODE_HEAT:
-            await self._device.set_active(True)
-        elif hvac_mode == HVAC_MODE_OFF:
-            await self._device.set_active(False)
-
-        # Hier logica om de modus op je apparaat in te stellen, indien nodig
         self.async_write_ha_state()
+
+        if hvac_mode == HVACMode.HEAT:
+            await self._device.set_active(True)
+            active = True
+        elif hvac_mode == HVACMode.OFF:
+            await self._device.set_active(False)
+            active = False
+
+        if self._device.powerSwitch is not None:
+            self._device.powerSwitch._is_on = active
+            await self._device.powerSwitch.update_state()
+
+    @property
+    def supported_features(self):
+        return ClimateEntityFeature.TARGET_TEMPERATURE
 
     async def update_state(self):
         self.async_write_ha_state()
@@ -92,7 +89,7 @@ class HarviaThermostat(ClimateEntity):
         #self._current_temperature = await self._device.fetch_current_temperature()
         #self._target_temperature = await self._device.fetch_target_temperature()
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
+async def async_setup_entry(hass, entry, async_add_entities):
     """Set up de Harvia theromostats."""
     # Hier zou je de logica toevoegen om je apparaten op te halen.
     # Voor nu voegen we handmatig een schakelaar toe als voorbeeld.
