@@ -23,7 +23,7 @@ class HarviaSaunaConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             # Hier zou je de inloggegevens valideren
             api =  HarviaSaunaAPI(user_input[CONF_USERNAME], user_input[CONF_PASSWORD],self.hass)
-            valid = await api.authenticate(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
+            valid = await api.authenticate()
             if valid:
                 return self.async_create_entry(title="Harvia Sauna", data=user_input)
             else:

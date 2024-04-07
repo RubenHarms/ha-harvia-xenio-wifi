@@ -1,8 +1,6 @@
 from __future__ import annotations
 import json
 import logging
-import re
-import base64
 import asyncio
 import signal
 import websockets
@@ -12,9 +10,9 @@ import uuid
 import random
 
 
-from urllib.parse import quote
 from .switch import HarviaPowerSwitch, HarviaLightSwitch
 from .climate import HarviaThermostat
+from .api import HarviaSaunaAPI
 from .binary_sensor import HarviaDoorSensor
 from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER, STATE_CODE_SAFETY,STATE_CODE_HEATING, STATE_CODE_RESTING_PERIOD
 from homeassistant.core import HomeAssistant
@@ -27,6 +25,7 @@ from pycognito import Cognito
 import boto3
 
 _LOGGER = logging.getLogger('custom_component.harvia_sauna')
+ENTITY_TYPES = [ 'switch', 'climate',  'binary_sensor']
 
 class HarviaDevice:
     def __init__(self, sauna: HarviaSauna, id: str):
@@ -209,11 +208,11 @@ class HarviaWebsock:
     async def start(self):
         """Probeer opnieuw verbinding te maken in geval van verbreking."""
         try:
-            endpoint = await self.sauna.get_websock_endpoint(self.endpoint)
+            endpoint = await self.sauna.api.getWebsocketEndpoint(self.endpoint)
             self.endpoint_host = endpoint['host']
             self.uuid = str(uuid.uuid4())
 
-            url = await self.sauna.websock_get_url(self.endpoint)
+            url = await self.sauna.api.getWebsockUrlByEndpoint(self.endpoint)
             payload = {'type': 'connection_init'}
             _LOGGER.debug(f"wssUrl: {url}")
 
@@ -239,8 +238,7 @@ class HarviaWebsock:
 
     async def create_subscription(self):
 
-        id_token = await self.sauna.get_id_token()
-
+        id_token = await self.sauna.api.getIdToken()
         data = ""
         if self.endpoint == 'data':
             data =  await self.create_data_subscription_message()
@@ -321,6 +319,7 @@ class HarviaSauna:
         self.cognito = None
         self.websockDevice = None
         self.websockData = None
+        self.api = None
 
     async def async_setup(self, config: dict) -> bool:
         """Stel de Harvia Sauna component in op basis van configuration.yaml."""
@@ -331,57 +330,44 @@ class HarviaSauna:
         if DOMAIN not in self.hass.data:
             self.hass.data[DOMAIN] = {}
 
+        username = self.config.data.get(CONF_USERNAME)
+        password = self.config.data.get(CONF_PASSWORD)
+
+        self.api =  HarviaSaunaAPI(username, password, self.hass)
+        if await self.api.authenticate():
+            _LOGGER.info("Harvia Sauna component setup completed.")
+        else:
+            _LOGGER.info("Error! Could'nt authenticate!")
+            return False
+
         await self.update_devices()
         self.hass.loop.create_task(self.check_connections())
         self.hass.data[DOMAIN]['api'] = self
 
-        _LOGGER.info("Harvia Sauna component setup completed.")
         return True
 
     async def get_device(self, deviceId: str) -> dict:
-        headers = await self.get_headers()
-
-        data_string = json.dumps(headers, indent=4)
-        device_query = { "operationName": "Query", "variables": {  "deviceId": deviceId  },      "query": "query Query($deviceId: ID!) {\n  getDeviceState(deviceId: $deviceId) {\n    desired\n    reported\n    timestamp\n    __typename\n  }\n}\n"}
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-        url = self.data['endpoints']['device']['endpoint']
-        async with session.post(url, json=device_query, headers=headers) as response:
-            deviceResp = await response.json()
-            data_string = json.dumps(deviceResp, indent=4)
-            _LOGGER.debug(f"Ontvangen data: {data_string}")
-            deviceData = json.loads(deviceResp['data']['getDeviceState']['reported'])
-
-        return deviceData
+        query = { "operationName": "Query", "variables": {  "deviceId": deviceId  },      "query": "query Query($deviceId: ID!) {\n  getDeviceState(deviceId: $deviceId) {\n    desired\n    reported\n    timestamp\n    __typename\n  }\n}\n"}
+        data = await self.api.endpoint('device', query )
+        return json.loads(data['data']['getDeviceState']['reported'])
 
     async def get_latest_device_data(self, deviceId: str) -> dict:
-        headers = await self.get_headers()
-        data_string = json.dumps(headers, indent=4)
-        data_query ={
-                        "operationName": "Query",
-                        "variables": {
-                            "deviceId": deviceId
-                        },
-                        "query": "query Query($deviceId: String!) {\n  getLatestData(deviceId: $deviceId) {\n    deviceId\n    timestamp\n    sessionId\n    type\n    data\n    __typename\n  }\n}\n"
-                    }
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-        url = self.data['endpoints']['data']['endpoint']
-        async with session.post(url, json=data_query, headers=headers) as response:
-            deviceResp = await response.json()
-            data_string = json.dumps(deviceResp, indent=4)
-            _LOGGER.debug(f"Ontvangen data: {data_string}")
-            deviceData = json.loads(deviceResp['data']['getLatestData']['data'])
-
-            deviceData['timestamp'] = deviceResp['data']['getLatestData']['timestamp']
-            deviceData['type'] = deviceResp['data']['getLatestData']['type']
-
+        query ={
+            "operationName": "Query",
+            "variables": {
+                "deviceId": deviceId
+            },
+            "query": "query Query($deviceId: String!) {\n  getLatestData(deviceId: $deviceId) {\n    deviceId\n    timestamp\n    sessionId\n    type\n    data\n    __typename\n  }\n}\n"
+        }
+        data = await self.api.endpoint('data', query)
+        deviceData = json.loads(data['data']['getLatestData']['data'])
+        deviceData['timestamp'] = data['data']['getLatestData']['timestamp']
+        deviceData['type'] = data['data']['getLatestData']['type']
         return deviceData
 
     async def get_headers(self) -> dict:
-        id_token = await self.get_id_token()
-        headers = {
-            'authorization': id_token
-        }
-        return headers
+        _LOGGER.warning("get_headers is DEPRICATED use HarviaSaunaApi.getHeaders() instead.")
+        return await self.api.getHeaders()
 
     async def get_devices(self) -> list:
         if self.devices is None:
@@ -390,73 +376,34 @@ class HarviaSauna:
 
 
     async def update_devices(self):
-
         self.devices = []
 
-        headers = await self.get_headers()
-        device_data= {
+        query = {
         "operationName": "Query",
         "variables": {},
         "query": 'query Query {\n  getDeviceTree\n}\n'
         }
 
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-
-        url = self.data['endpoints']['device']['endpoint']
-        async with session.post(url, json=device_data, headers=headers) as response:
-            self.devices = []
-            deviceTree = await response.json()
-            data_string = json.dumps(deviceTree, indent=4)
-            _LOGGER.debug(f"Ontvangen data: {data_string}")
-
-            # Zorg ervoor dat je eerst controleert of 'data' en 'getDeviceTree' in de response aanwezig zijn
-            if 'data' in deviceTree and 'getDeviceTree' in deviceTree['data']:
-                # Als 'getDeviceTree' gevonden is, kun je de data eruit halen
-                devicesTreeData =  json.loads(deviceTree['data']['getDeviceTree'])
-                # Hieronder ga ik ervan uit dat devicesTreeData een lijst van dictionaries is en we geïnteresseerd zijn in de 'c' sleutel van het eerste element.
-                # Pas dit aan op basis van de werkelijke structuur van je data.
-                if devicesTreeData:  # Check of de lijst niet leeg is
-                    data_string = json.dumps(devicesTreeData, indent=4)
-                    _LOGGER.debug(f"Devices: {data_string}")
-                    devices = devicesTreeData[0]['c']
-                    for device in devices:
-                        deviceId = device['i']['name']
-
-                        deviceData = await self.get_device(deviceId)
-                        latestDeviceData = await self.get_latest_device_data(deviceId)
-                        deviceObject  = HarviaDevice(sauna=self, id=deviceId)
-
-                        await deviceObject.update_data(deviceData)
-                        await deviceObject.update_data(latestDeviceData)
-                        self.devices.append(deviceObject)
-
-
-                    # Doe iets met 'devices'
-                else:
-                    _LOGGER.error("Geen devices gevonden in de response.")
+        deviceTree = await self.api.endpoint('device', query)
+        if 'data' in deviceTree and 'getDeviceTree' in deviceTree['data']:
+            devicesTreeData =  json.loads(deviceTree['data']['getDeviceTree'])
+            if devicesTreeData:  # Check of de lijst niet leeg is
+                data_string = json.dumps(devicesTreeData, indent=4)
+                devices = devicesTreeData[0]['c']
+                for device in devices:
+                    deviceId = device['i']['name']
+                    _LOGGER.info("Found device: " + deviceId)
+                    deviceData = await self.get_device(deviceId)
+                    latestDeviceData = await self.get_latest_device_data(deviceId)
+                    deviceObject  = HarviaDevice(sauna=self, id=deviceId)
+                    await deviceObject.update_data(deviceData)
+                    await deviceObject.update_data(latestDeviceData)
+                    self.devices.append(deviceObject)
             else:
-                _LOGGER.error("Onverwachte structuur van de response: 'data' of 'getDeviceTree' niet gevonden.")
+                _LOGGER.error("Geen devices gevonden in de response.")
+        else:
+            _LOGGER.error("Onverwachte structuur van de response: 'data' of 'getDeviceTree' niet gevonden.")
 
-    async def check_and_renew_token(self):
-        client = await self.get_client()
-
-        current_id_token = self.data['token_data']['id_token']
-        await self.hass.async_add_executor_job(
-            lambda: client.check_token(renew=True)
-        )
-        self.data["token_data"] = {
-            "access_token": client.access_token,
-            "refresh_token": client.refresh_token,
-            "id_token": client.id_token,
-        }
-
-        if current_id_token != client.id_token:
-            _LOGGER.debug(f"Token renewed! {current_id_token} != {client.id_token}")
-
-
-    async def get_id_token(self) -> str:
-        await self.check_and_renew_token()
-        return self.data['token_data']['id_token']
 
     async def process_device_update(self, message: dict):
 
@@ -484,10 +431,7 @@ class HarviaSauna:
             await device.update_data(data)
 
     async def device_mutation(self, deviceId: str, payload: str):
-
         payloadString =  json.dumps(payload, indent=4)
-
-        headers = await self.get_headers()
         query = {   "operationName": "Mutation",
                     "variables": {
                     "deviceId": deviceId,
@@ -496,93 +440,28 @@ class HarviaSauna:
                     },
                     "query": "mutation Mutation($deviceId: ID!, $state: AWSJSON!, $getFullState: Boolean) {\n  requestStateChange(deviceId: $deviceId, state: $state, getFullState: $getFullState)\n}\n"
                 }
-
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-
-        url = self.data['endpoints']['device']['endpoint']
-        async with session.post(url, json=query, headers=headers) as response:
-            response = await response.json()
-            responseString = json.dumps(response, indent=4)
-            _LOGGER.debug(f"Device mutation: {responseString}")
+        response = self.api.endpoint('device', query)
+        return response
 
     async def get_client(self) -> Cognito:
         if self.cognito == None:
             await self.authenticate_and_save_tokens()
-
-
         return self.cognito
 
-    async def fetch_and_save_endpoints(self):
-        """Haalt endpoints op en slaat deze op als ze nog niet bestaan."""
-        _LOGGER.debug("Fetching and saving endpoints.")
-
-        if "endpoints" not in self.data:
-            self.data['endpoints'] = {}
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-            endpoints = ["users", "device", "events", "data"]
-            for endpoint in endpoints:
-                url = f'https://prod.myharvia-cloud.net/{endpoint}/endpoint'
-                _LOGGER.debug(f"Fetching endpoint: {url}")
-                async with session.get(url) as response:
-                    self.data['endpoints'][endpoint] = await response.json()
-                    data_string = json.dumps(self.data['endpoints'][endpoint], indent=4)
-                    _LOGGER.debug(f"Ontvangen data: {data_string}")
-
-            await self.storage.async_save(self.data)
-            _LOGGER.info("Endpoints successfully fetched and saved.")
-        else:
-            _LOGGER.info("Endpoints already exist and were not fetched.")
-            data_string = json.dumps(self.data['endpoints'], indent=4)
-            _LOGGER.debug(f"Endpoint data: {data_string}")
-
-    async def get_websock_endpoint(self, endpoint: str) -> dict:
-        user_endpoint = self.data['endpoints'][endpoint]['endpoint']
-        regex = r"^https:\/\/(.+)\.appsync-api\.(.+)\/graphql$"
-        regexReplace = r"wss://\1.appsync-realtime-api.\2/graphql"
-        regexReplaceHost = r"\1.appsync-api.\2"
-
-        wssUrl = re.sub(regex, regexReplace, user_endpoint)
-        host = re.sub(regex, regexReplaceHost, user_endpoint)
-
-        return { 'wssUrl': wssUrl, 'host': host}
-
     async def websock_get_url(self, endpoint) -> str:
-        websockEndpoint = await self.get_websock_endpoint(endpoint)
-        data_string = json.dumps(websockEndpoint, indent=4)
-        _LOGGER.debug(f"Websock endpoint: {data_string}")
-
-        id_token = await self.get_id_token()
-        headerPayload = {"Authorization":id_token,"host":websockEndpoint['host']}
-
-        data_string = str(json.dumps(headerPayload, indent=4))
-        _LOGGER.debug(f"Websock data: {data_string}")
-
-        encoded_header = base64.b64encode(data_string.encode())
-        _LOGGER.debug(f"Encoded data: {encoded_header}")
-
-        wssUrl = websockEndpoint['wssUrl']+ '?header='+ quote(encoded_header)+'&payload=e30='
-        return wssUrl
+        return await self.api.getWebsockUrlByEndpoint(endpoint)
 
     async def get_user_data(self):
         if self.user_data is not None:
             return self.user_data
-        headers = await self.get_headers()
-
-        user_query= {
-        "operationName": "Query",
-        "variables": {},
-        "query": "query Query {\n  getCurrentUserDetails {\n    email\n    organizationId\n    admin\n    given_name\n    family_name\n    superAdmin\n    rdUser\n    appSettings\n    __typename\n  }\n}\n"
+        query= {
+            "operationName": "Query",
+            "variables": {},
+            "query": "query Query {\n  getCurrentUserDetails {\n    email\n    organizationId\n    admin\n    given_name\n    family_name\n    superAdmin\n    rdUser\n    appSettings\n    __typename\n  }\n}\n"
         }
-
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
-        url = self.data['endpoints']['users']['endpoint']
-        async with session.post(url, json=user_query, headers=headers) as response:
-            user_data = await response.json()
-            data_string = json.dumps(user_data, indent=4)
-            _LOGGER.debug(f"User data: {data_string}")
-
-            self.user_data = user_data['data']['getCurrentUserDetails']
-            return  self.user_data
+        data = await self.api.endpoint('users',query )
+        self.user_data = data['data']['getCurrentUserDetails']
+        return  self.user_data
 
     async def check_connections(self):
         while True:
@@ -609,47 +488,6 @@ class HarviaSauna:
             await asyncio.sleep(60)
 
 
-    async def authenticate_and_save_tokens(self):
-        """Authenticateert met de service en slaat de tokens op."""
-        _LOGGER.debug("Authenticating and saving tokens.")
-
-        await self.fetch_and_save_endpoints()
-        user_pool_id = self.data["endpoints"]["users"]["userPoolId"]
-        client_id = self.data["endpoints"]["users"]["clientId"]
-        id_token = self.data["endpoints"]["users"]["identityPoolId"]
-        username = self.config.data.get(CONF_USERNAME)
-        password = self.config.data.get(CONF_PASSWORD)
-
-        _LOGGER.debug("Using Cognito for authentication.")
-
-        u = await self.hass.async_add_executor_job(
-            lambda: Cognito(user_pool_id, client_id, username=username, user_pool_region=REGION, id_token=id_token)
-        )
-        self.cognito = u
-
-        _LOGGER.debug("Using username: " + username + ' - with password:"'+password+ "'")
-
-        await self.hass.async_add_executor_job(
-
-            lambda: u.authenticate(password=password)
-        )
-
-        self.data["token_data"] = {
-            "access_token": u.access_token,
-            "refresh_token": u.refresh_token,
-            "id_token": u.id_token,
-        }
-
-        data_string = json.dumps( self.data["token_data"], indent=4)
-        await self.check_and_renew_token()
-        await self.storage.async_save(self.data)
-        _LOGGER.info("Authentication successful, tokens saved.")
-
-        data_string = json.dumps( self.data["token_data"], indent=4)
-        _LOGGER.debug(f"Token data: {data_string}")
-
-        self.hass.data[DOMAIN]["token_data"] = self.data["token_data"]
-
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Setup de Harvia Sauna integratie."""
     boto3.set_stream_logger('custom_component.harvia_sauna')
@@ -665,38 +503,24 @@ async def async_setup_entry(hass, entry):
     username = entry.data.get(CONF_USERNAME)
     password = entry.data.get(CONF_PASSWORD)
 
-
     if not username or not password:
-        _LOGGER.error("Gebruikersnaam of wachtwoord niet geconfigureerd.")
+        _LOGGER.error("Username or password not configured.")
         return False
 
     storage = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     harvia_sauna = HarviaSauna(hass, storage, entry)
     await harvia_sauna.async_setup(entry)
 
-
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, 'switch')
-    )
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, 'climate')
-    )
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setup(entry, 'binary_sensor')
-    )
-
+    for entity_type in ENTITY_TYPES:
+        hass.async_create_task(  hass.config_entries.async_forward_entry_setup(entry, entity_type) )
 
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Handel het ontladen van een configuratie-entry."""
     # Ontlaad platformen die deel uitmaken van de integratie
-    await hass.config_entries.async_forward_entry_unload(entry, "sensor")
-    await hass.config_entries.async_forward_entry_unload(entry, "switch")
-
-    # Opruimen van resources, uitloggen, etc.
-    #api_client = hass.data[DOMAIN].pop(entry.entry_id)
-    #await api_client.logout()
+    for entity_type in ENTITY_TYPES:
+        await hass.config_entries.async_forward_entry_unload(entry, entity_type)
 
     return True
 

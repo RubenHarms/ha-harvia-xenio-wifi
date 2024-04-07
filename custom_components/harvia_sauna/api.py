@@ -2,7 +2,11 @@ from pycognito import Cognito
 import boto3
 import logging
 import json
+import re
+import base64
 import botocore.exceptions
+from urllib.parse import quote
+
 
 from .constants import DOMAIN, REGION
 
@@ -41,17 +45,19 @@ class HarviaSaunaAPI:
 
         return self.endpoints
 
-    async def authenticate(self, username, password):
+    async def authenticate(self):
+        if self.token_data is not None:
+            return True
 
-        u = await self.get_client()
+        u = await self.getClient()
         """Authenticateert met de service en slaat de tokens op."""
         _LOGGER.debug("Authenticating")
-        _LOGGER.debug("Using username: " + username + ' - with password:"'+password+ "'")
+        _LOGGER.debug("Using username: " + self.username + ' - with password:"'+self.password+ "'")
 
         try:
             await self.hass.async_add_executor_job(
 
-                lambda: u.authenticate(password=password)
+                lambda: u.authenticate(password=self.password)
             )
         except botocore.exceptions.ClientError as e:
             _LOGGER.info("Authentication failed: " + str(e))
@@ -63,15 +69,13 @@ class HarviaSaunaAPI:
             "id_token": u.id_token,
         }
 
-        await self.checkAndRenewTokens()
-
         _LOGGER.info("Authentication successful, tokens saved.")
         data_string = json.dumps( self.token_data, indent=4)
         _LOGGER.debug(f"Token data: {data_string}")
 
         return True
 
-    async def get_client(self) -> Cognito:
+    async def getClient(self) -> Cognito:
         if self.client is None:
 
             endpoints = await self.getEndpoints()
@@ -87,9 +91,13 @@ class HarviaSaunaAPI:
 
         return self.client
 
-    async def checkAndRenewTokens(self):
-        client = await self.get_client()
+    async def getAuthenticatedClient(self) -> Cognito:
+        client = await self.getClient()
+        await self.authenticate()
+        return client
 
+    async def checkAndRenewTokens(self):
+        client = await self.getAuthenticatedClient()
         current_id_token = self.token_data['id_token']
         await self.hass.async_add_executor_job(
             lambda: client.check_token(renew=True)
@@ -102,3 +110,45 @@ class HarviaSaunaAPI:
 
         if current_id_token != client.id_token:
             _LOGGER.debug(f"Token renewed! {current_id_token} != {client.id_token}")
+
+    async def getIdToken(self) -> str:
+        await self.checkAndRenewTokens()
+        return self.token_data['id_token']
+
+    async def getHeaders(self) -> dict:
+        idToken = await self.getIdToken()
+        headers = {
+            'authorization': idToken
+        }
+        return headers
+
+    async def endpoint(self, endpoint: str, query: dict) -> dict:
+        headers = await self.getHeaders()
+        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        url = self.endpoints[endpoint]['endpoint']
+        queryDump = json.dumps(query, indent=4)
+        _LOGGER.debug("Endpoint request on '" + url + "':")
+        _LOGGER.debug("\tQuery:" + queryDump)
+        async with session.post(url, json=query, headers=headers) as response:
+            data = await response.json()
+            dataString = json.dumps(data, indent=4)
+            _LOGGER.debug(f"\tReturned data: {dataString}")
+            return data
+
+    async def getWebsocketEndpoint(self, endpoint: str) -> dict:
+        endpoint = self.endpoints[endpoint]['endpoint']
+        regex = r"^https:\/\/(.+)\.appsync-api\.(.+)\/graphql$"
+        regexReplace = r"wss://\1.appsync-realtime-api.\2/graphql"
+        regexReplaceHost = r"\1.appsync-api.\2"
+        wssUrl = re.sub(regex, regexReplace, endpoint)
+        host = re.sub(regex, regexReplaceHost, endpoint)
+        return { 'wssUrl': wssUrl, 'host': host}
+
+    async def getWebsockUrlByEndpoint(self, endpoint) -> str:
+        websockEndpoint = await self.getWebsocketEndpoint(endpoint)
+        id_token = await self.getIdToken()
+        headerPayload = {"Authorization":id_token,"host":websockEndpoint['host']}
+        data_string = str(json.dumps(headerPayload, indent=4))
+        encoded_header = base64.b64encode(data_string.encode())
+        wssUrl = websockEndpoint['wssUrl']+ '?header='+ quote(encoded_header)+'&payload=e30='
+        return wssUrl
