@@ -606,7 +606,7 @@ class HarviaSauna:
                 await self.websockData.connect()
             else:
                 _LOGGER.debug("\tWebsocket Data: RUNNING")
-            await asyncio.sleep(10)
+            await asyncio.sleep(60)
 
 
     async def authenticate_and_save_tokens(self):
