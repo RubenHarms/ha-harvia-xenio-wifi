@@ -55,8 +55,7 @@ class HarviaDevice:
         self.switches = None
         self.thermostats = None
         self.lastestUpdate = None
-        self.websockDevice = None
-        self.websockData = None
+
 
     async def update_data(self, data: dict):
         self.data = data
@@ -191,6 +190,7 @@ class HarviaDevice:
 
         return self.switches
 
+
 class HarviaWebsock:
 
     def __init__(self, sauna: HarviaSauna, endpoint: str):
@@ -201,10 +201,10 @@ class HarviaWebsock:
         self.endpoint_host = None
         self.reconnect_attempts = 0
         self.uuid = None
+        self.websocket_task = None
 
     async def connect(self):
-        self.reconnect_attempts = 0
-        asyncio.create_task(self.start())
+        self.websocket_task = asyncio.create_task(self.start())
 
     async def start(self):
         """Probeer opnieuw verbinding te maken in geval van verbreking."""
@@ -233,8 +233,9 @@ class HarviaWebsock:
                 _LOGGER.error("Verbindingsfout: %s", e)
 
         await asyncio.sleep(min(2 ** self.reconnect_attempts, 60) + random.uniform(0, 1))
+
         self.reconnect_attempts += 1
-        asyncio.create_task(self.start())
+        self.websocket_task = asyncio.create_task(self.start())
 
     async def create_subscription(self):
 
@@ -318,6 +319,8 @@ class HarviaSauna:
         self.devices = None
         self.user_data = None
         self.cognito = None
+        self.websockDevice = None
+        self.websockData = None
 
     async def async_setup(self, config: dict) -> bool:
         """Stel de Harvia Sauna component in op basis van configuration.yaml."""
@@ -329,8 +332,7 @@ class HarviaSauna:
             self.hass.data[DOMAIN] = {}
 
         await self.update_devices()
-        await self.websocket_init()
-
+        self.hass.loop.create_task(self.check_connections())
         self.hass.data[DOMAIN]['api'] = self
 
         _LOGGER.info("Harvia Sauna component setup completed.")
@@ -561,14 +563,6 @@ class HarviaSauna:
         wssUrl = websockEndpoint['wssUrl']+ '?header='+ quote(encoded_header)+'&payload=e30='
         return wssUrl
 
-
-    async def websocket_init(self):
-        self.websockDevice = HarviaWebsock(self, 'device')
-        await self.websockDevice.connect()
-
-        self.websockData = HarviaWebsock(self, 'data')
-        await self.websockData.connect()
-
     async def get_user_data(self):
         if self.user_data is not None:
             return self.user_data
@@ -589,6 +583,30 @@ class HarviaSauna:
 
             self.user_data = user_data['data']['getCurrentUserDetails']
             return  self.user_data
+
+    async def check_connections(self):
+        while True:
+            _LOGGER.debug("Checking websocket connections: ")
+            if self.websockDevice is None:
+                self.websockDevice = HarviaWebsock(self, 'device')
+                await self.websockDevice.connect()
+
+            if self.websockData is None:
+                self.websockData = HarviaWebsock(self, 'data')
+                await self.websockData.connect()
+
+            if self.websockDevice and self.websockDevice.websocket_task.done():
+                _LOGGER.debug("WebSocket Device: NOT RUNNING. Reconnecting!")
+                await self.websockDevice.connect()
+            else:
+                _LOGGER.debug("\tWebsocket Device: RUNNING")
+
+            if self.websockData and self.websockData.websocket_task.done():
+                _LOGGER.debug("\tWebSocket Data: NOT RUNNING. Reconnecting!")
+                await self.websockData.connect()
+            else:
+                _LOGGER.debug("\tWebsocket Data: RUNNING")
+            await asyncio.sleep(10)
 
 
     async def authenticate_and_save_tokens(self):
