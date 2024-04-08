@@ -440,7 +440,7 @@ class HarviaSauna:
                     },
                     "query": "mutation Mutation($deviceId: ID!, $state: AWSJSON!, $getFullState: Boolean) {\n  requestStateChange(deviceId: $deviceId, state: $state, getFullState: $getFullState)\n}\n"
                 }
-        response = self.api.endpoint('device', query)
+        response = await self.api.endpoint('device', query)
         return response
 
     async def get_client(self) -> Cognito:
