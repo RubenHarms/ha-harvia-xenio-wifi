@@ -1,6 +1,8 @@
-# Harvia Sauna
+# Harvia Sauna integration for Home Assistant
 
-Home Assistant component for Harvia Sauna (working with Xenio Wifi), using the same API as the MyHarvia App.
+[![BuyMeCoffee][buymecoffeebadge]][buymecoffee]
+
+Unofficial Home Assistant component for Harvia Sauna (working with Xenio Wifi), using the same API as the MyHarvia App.
 
 
 ## WARNING: Pre-alpha development release
@@ -47,3 +49,8 @@ For version 0.0.7:
 - Creating reconnection machanism
 
 Please do! Open a Pull Request with your improvements. -->
+
+
+[home-assistant-harvia-sauna]: https://github.com/RubenHarms/ha-harvia-xenio-wifi
+[buymecoffee]: https://www.buymeacoffee.com/rubenharms
+[buymecoffeebadge]: https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png
