@@ -7,9 +7,9 @@ Unofficial Home Assistant component for Harvia Sauna (working with Xenio Wifi), 
 
 ## WARNING: Pre-alpha development release
 
-*This component is still in 'pre-alpha' and can exhibit unpredictable behavior. I am happy that I have already achieved this result. Still, I would appreciate you installing the component so that I can gather information and feedback to improve the component. After all, I only have one sauna and without extensive testing it won't get better.  Keep an eye on this page.* 
+*This component is still in 'pre-alpha' and can exhibit unpredictable behavior. I have tested the component for a few days now and it seems to be quite stable. I have now managed to run the component for a day without it breaking. I would appreciate it if you install the component so that I can gather information and feedback to improve the component. After all, I only have one sauna and without extensive testing it won't get better. Keep an eye on this page..* 
 
-(updated at April 4, 2024)
+(updated at April 9, 2024)
 
 Component is in development and currently only publishes:
 
@@ -41,15 +41,18 @@ Your username and password is corresponding with the MyHarvia app.
 
 - Connection interruption ensures that no new sauna updates are received as no 'reconnect' mechanism has yet been created for web sockets. You need to restart HA in order to reset the component. -->
 
-<!-- 
+
 ## Road map (short term)
 
-For version 0.0.7: 
-
-- Creating reconnection machanism
+- Creating support for Fan
+- Creating support for Steamer
 
 Please do! Open a Pull Request with your improvements. -->
 
+
+## Credits
+
+This integration was developed by Ruben Harms. It uses the unofficial API of Harvia Xenio WiFi controllers and is not directly associated with Harvia.
 
 [home-assistant-harvia-sauna]: https://github.com/RubenHarms/ha-harvia-xenio-wifi
 [buymecoffee]: https://www.buymeacoffee.com/rubenharms
