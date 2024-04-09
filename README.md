@@ -47,7 +47,7 @@ Your username and password is corresponding with the MyHarvia app.
 - Creating support for Fan
 - Creating support for Steamer
 
-Please do! Open a Pull Request with your improvements. -->
+<!-- Please do! Open a Pull Request with your improvements. -->
 
 
 ## Credits
