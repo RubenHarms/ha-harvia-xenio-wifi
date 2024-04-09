@@ -8,11 +8,6 @@ from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER
 class HarviaDoorSensor(BinarySensorEntity):
     """Een sensor die aangeeft of de Harvia sauna deur open of gesloten is."""
 
-    #331784 Resting period
-    #397322 Safety
-    #135432 Heating
-    #4108 Standby
-
     def __init__(self, device, name, sauna):
         """Initialiseer de sensor."""
         self._name = name + ' Door'
