@@ -14,7 +14,7 @@ from .switch import HarviaPowerSwitch, HarviaLightSwitch
 from .climate import HarviaThermostat
 from .api import HarviaSaunaAPI
 from .binary_sensor import HarviaDoorSensor
-from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER, STATE_CODE_SAFETY,STATE_CODE_HEATING, STATE_CODE_RESTING_PERIOD
+from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER, STATE_CODE_SAFETY,STATE_CODE_HEATING, STATE_CODE_RESTING_PERIOD, STATE_CODE_STANDBY_SAFETY
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 from homeassistant.components.climate import ClimateEntity
@@ -110,7 +110,7 @@ class HarviaDevice:
 
         if self.doorSensor is not None:
             # _LOGGER.error("Door sensor loaded")
-            if self.statusCodes == STATE_CODE_SAFETY:
+            if self.statusCodes in (STATE_CODE_SAFETY, STATE_CODE_STANDBY_SAFETY):
                 _LOGGER.error("Door is open")
                 self.doorSensor._state = STATE_ON
             else:
