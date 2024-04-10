@@ -24,7 +24,7 @@ Component has been tested with the Harvia Xenio Wifi (CX001WIFI) and Harvia Cili
 
 ## Installation
 
-Add a custom repository https://github.com/RubenHarms/ha-harvia-xenio-wifi.git/ to HACS and search for Harvia Sauna to install.
+Add a custom repository [https://github.com/RubenHarms/ha-harvia-xenio-wifi/](https://github.com/RubenHarms/ha-harvia-xenio-wifi/) to HACS and search for Harvia Sauna to install.
 Restart Homeassistant 
 
 ## Configuration
