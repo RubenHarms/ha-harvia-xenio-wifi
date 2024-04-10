@@ -1,5 +1,5 @@
 {
   "name": "Harvia Sauna",
-  "content_in_root": true,
+  "content_in_root": false,
   "render_readme": true
 }
