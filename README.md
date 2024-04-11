@@ -11,13 +11,13 @@ Unofficial Home Assistant component for Harvia Sauna (working with Xenio Wifi), 
 
 (updated at April 9, 2024)
 
-Component is in development and currently only publishes:
+Components support at the moment:
 
-- Sauna light switch
-- Sauna power switch (enables heater)
-- Sauna termostat (current and target temp)
-- Sauna door sensor (safety circuit)
-
+- Light switch
+- Power switch (enables heater)
+- Fan switch
+- Termostat (current and target temp)
+- Door sensor (safety circuit)
 
 ## Compatibility
 Component has been tested with the Harvia Xenio Wifi (CX001WIFI) and Harvia Cilindro PC90XE, but may also work with other sauna's compatible with the MyHarvia app, as it uses the same API.
@@ -44,8 +44,8 @@ Your username and password is corresponding with the MyHarvia app.
 
 ## Road map (short term)
 
-- Creating support for Fan
-- Creating support for Steamer
+- Support for Steamer
+- Suppport to schedule Single Session timed start
 
 <!-- Please do! Open a Pull Request with your improvements. -->
 
