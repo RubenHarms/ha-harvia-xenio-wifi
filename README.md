@@ -44,6 +44,7 @@ Your username and password is corresponding with the MyHarvia app.
 
 ## Road map (short term)
 
+- Adding [Device Triggers](https://developers.home-assistant.io/docs/device_automation_trigger): Heated up, Standby, Rested etc.... 
 - Support for Steamer
 - Suppport to schedule Single Session timed start
 
