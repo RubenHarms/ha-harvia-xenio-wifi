@@ -29,6 +29,8 @@ After installation via HACS, you need to add the integration to Home Assistant:
 The Harvia Sauna integration supports the following features:
 
 - **Switch On/Off**: Turn your sauna on or off.
+- **Light switch**: Turn your sauna lights on or off.
+- **Fan switch**: Turn your sauna fan on or off.
 - **Target Temperature**: Set your desired sauna temperature.
 - **Monitoring**: View the current state, including whether the sauna is on or off, and the current temperature.
 - **Door Sensor**: Detect if the sauna door is open or closed, enhancing safety and energy efficiency.
