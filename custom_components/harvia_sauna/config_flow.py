@@ -61,8 +61,8 @@ class HarviaSaunaOptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Required(CONF_USERNAME, default=self.hass.data[DOMAIN][CONF_USERNAME]): str,
-                vol.Required(CONF_PASSWORD, default=self.hass.data[DOMAIN][CONF_PASSWORD]): str,
+                vol.Required(CONF_USERNAME, default=self.config_entry.data.get(CONF_USERNAME)): str,
+                vol.Required(CONF_PASSWORD, default=self.config_entry.data.get(CONF_PASSWORD)): str,
             }),
             errors=errors
         )

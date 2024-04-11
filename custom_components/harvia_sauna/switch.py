@@ -103,6 +103,50 @@ class HarviaLightSwitch(SwitchEntity):
         await self._device.set_lights(False)
         self._is_on = False
 
+class HarviaFanSwitch(SwitchEntity):
+    def __init__(self, device, name, sauna):
+        self._device = device
+        self._name = name + ' Fan Switch'
+        self._is_on = device.fanOn
+        self._device_id = device.id + '_fan'
+        self._sauna = sauna
+        self._attr_unique_id = device.id + '_fan'
+        self._attr_icon = 'mdi:fan'
+
+
+    async def async_added_to_hass(self):
+        """Acties die uitgevoerd moeten worden als entiteit aan HA is toegevoegd."""
+        self._device.fanSwitch = self
+        await self._device.update_ha_devices()
+        #self._device.
+
+    async def update_state(self):
+        self.async_write_ha_state()
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def is_on(self):
+        return self._is_on
+
+
+    @property
+    def unique_id(self):
+        """Return een unieke ID."""
+        return self._device_id
+
+    async def async_turn_on(self, **kwargs):
+        # Code om de sauna aan te zetten
+        await self._device.set_fan(True)
+        self._is_on = True
+
+    async def async_turn_off(self, **kwargs):
+        # Code om de sauna uit te zetten
+        await self._device.set_fan(False)
+        self._is_on = False
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Set up de Harvia switches."""
     # Hier zou je de logica toevoegen om je apparaten op te halen.
@@ -117,3 +161,4 @@ async def async_setup_entry(hass, entry, async_add_entities):
             switches.append(device_switch)
 
     async_add_entities(switches, True)
+

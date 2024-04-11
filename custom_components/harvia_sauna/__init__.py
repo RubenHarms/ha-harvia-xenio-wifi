@@ -10,7 +10,7 @@ import uuid
 import random
 
 
-from .switch import HarviaPowerSwitch, HarviaLightSwitch
+from .switch import HarviaPowerSwitch, HarviaLightSwitch, HarviaFanSwitch
 from .climate import HarviaThermostat
 from .api import HarviaSaunaAPI
 from .binary_sensor import HarviaDoorSensor
@@ -48,6 +48,7 @@ class HarviaDevice:
         self.name = None
         self.lightSwitch = None
         self.powerSwitch = None
+        self.fanSwitch = None
         self.doorSensor = None
         self.thermostat = None
         self.binarySensors = None
@@ -67,8 +68,8 @@ class HarviaDevice:
             self.active = bool(data['active'])
         if 'light' in data:
             self.lightsOn = bool(data['light'])
-        if 'fanOn' in data:
-            self.fanOn = bool(data['fanOn'])
+        if 'fan' in data:
+            self.fanOn = bool(data['fan'])
         if 'steamOn' in data:
             self.fanOn = bool(data['steamOn'])
         if 'heatOn' in data:
@@ -105,6 +106,11 @@ class HarviaDevice:
             self.powerSwitch._is_on = self.active
             await self.powerSwitch.update_state()
 
+        if self.fanSwitch is not None:
+            self.fanSwitch._is_on = self.fanOn
+            await self.fanSwitch.update_state()
+
+
         safetyStatus =  int(str(self.statusCodes)[1])
 
         if self.doorSensor is not None:
@@ -131,6 +137,10 @@ class HarviaDevice:
         payload = {'targetTemp': temp}
         await self.sauna.device_mutation(deviceId=self.id,payload=payload)
 
+    async def set_fan(self, state: bool):
+        fanInt = int(state)
+        payload = {'fan': fanInt}
+        await self.sauna.device_mutation(deviceId=self.id,payload=payload)
 
     async def set_lights(self, state: bool):
         lightInt = int(state)
@@ -181,9 +191,13 @@ class HarviaDevice:
 
         powerSwitch = HarviaPowerSwitch(device=self, name=self.name, sauna=self.sauna)
         lightSwitch = HarviaLightSwitch(device=self, name=self.name, sauna=self.sauna)
+        fanSwitch = HarviaFanSwitch(device=self, name=self.name, sauna=self.sauna)
+
 
         self.switches.append(powerSwitch)
         self.switches.append(lightSwitch)
+        self.switches.append(fanSwitch)
+
 
         return self.switches
 
