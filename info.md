@@ -1,6 +1,6 @@
 # Harvia Sauna Integration for Home Assistant
 
-The Harvia Sauna integration using the MyHarvia App, allows you to control and monitor Harvia Xenio WIFI sauna controllers through Home Assistant. This integration supports switching the sauna on/off, setting the target temperature, monitoring the current state, and detecting if the sauna door is open or closed directly from the Home Assistant interface.
+The Harvia Sauna integration, using the MyHarvia App, allows you to control and monitor Harvia Xenio WIFI sauna controllers through Home Assistant. This integration supports switching the sauna, the lights, and the fan on/off, setting the target temperature, monitoring the current state, and detecting if the sauna door is open or closed directly from the Home Assistant interface.
 
 ## Installation via HACS
 
