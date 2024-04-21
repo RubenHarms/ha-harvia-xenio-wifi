@@ -10,8 +10,10 @@ import uuid
 import random
 
 
-from .switch import HarviaPowerSwitch, HarviaLightSwitch, HarviaFanSwitch
+from .switch import HarviaPowerSwitch, HarviaLightSwitch, HarviaFanSwitch, HarviaSteamerSwitch
 from .climate import HarviaThermostat
+from .sensor import HarviaHumiditySensor
+from .number import HarviaHumiditySetPoint
 from .api import HarviaSaunaAPI
 from .binary_sensor import HarviaDoorSensor
 from .constants import DOMAIN, STORAGE_KEY, STORAGE_VERSION, REGION,_LOGGER
@@ -25,7 +27,7 @@ from pycognito import Cognito
 import boto3
 
 _LOGGER = logging.getLogger('custom_component.harvia_sauna')
-ENTITY_TYPES = [ 'switch', 'climate',  'binary_sensor']
+ENTITY_TYPES = [ 'switch', 'climate',  'binary_sensor', 'sensor', 'number']
 
 class HarviaDevice:
     def __init__(self, sauna: HarviaSauna, id: str):
@@ -37,6 +39,7 @@ class HarviaDevice:
         self.lightsOn = False
         self.steamOn = False
         self.targetTemp = None
+        self.targetRh = None
         self.currentTemp = None
         self.humidity = None
         self.remainingTime = None
@@ -49,9 +52,14 @@ class HarviaDevice:
         self.lightSwitch = None
         self.powerSwitch = None
         self.fanSwitch = None
+        self.steamerSwitch = None
         self.doorSensor = None
         self.thermostat = None
         self.binarySensors = None
+        self.humiditySensor = None
+        self.humidityNumber = None
+        self.sensors = None
+        self.numbers = None
         self.switches = None
         self.thermostats = None
         self.lastestUpdate = None
@@ -71,7 +79,9 @@ class HarviaDevice:
         if 'fan' in data:
             self.fanOn = bool(data['fan'])
         if 'steamOn' in data:
-            self.fanOn = bool(data['steamOn'])
+            self.steamOn = data['steamOn']
+        if 'steamEn' in data:
+            self.steamOn = bool(data['steamEn'])
         if 'heatOn' in data:
             self.active = data['heatOn']
         if 'targetTemp' in data:
@@ -106,6 +116,10 @@ class HarviaDevice:
             self.powerSwitch._is_on = self.active
             await self.powerSwitch.update_state()
 
+        if self.steamerSwitch is not None:
+            self.steamerSwitch._is_on = self.steamOn
+            await self.steamerSwitch.update_state()
+
         if self.fanSwitch is not None:
             self.fanSwitch._is_on = self.fanOn
             await self.fanSwitch.update_state()
@@ -115,12 +129,20 @@ class HarviaDevice:
 
         if self.doorSensor is not None:
             if safetyStatus == 9:
-                _LOGGER.error("Door is open")
+                _LOGGER.debug("Door is open")
                 self.doorSensor._state = STATE_ON
             else:
-                _LOGGER.error("Door is closed")
+                _LOGGER.debug("Door is closed")
                 self.doorSensor._state = STATE_OFF
             await self.doorSensor.update_state()
+
+        if self.humiditySensor is not None:
+            self.humiditySensor._state = self.humidity
+            await self.humiditySensor.update_state()
+
+        if self.humidityNumber is not None:
+            self.humidityNumber._state = self.targetRh
+            await self.humidityNumber.update_state()
 
         if self.thermostat is not None:
             self.thermostat._target_temperature = self.targetTemp
@@ -137,6 +159,10 @@ class HarviaDevice:
         payload = {'targetTemp': temp}
         await self.sauna.device_mutation(deviceId=self.id,payload=payload)
 
+    async def set_target_relative_humidity(self, temp: int):
+        payload = {'targetRh': temp}
+        await self.sauna.device_mutation(deviceId=self.id,payload=payload)
+
     async def set_fan(self, state: bool):
         fanInt = int(state)
         payload = {'fan': fanInt}
@@ -147,6 +173,11 @@ class HarviaDevice:
         payload = {'light': lightInt}
         await self.sauna.device_mutation(deviceId=self.id,payload=payload)
 
+    async def set_steamer(self, state: bool):
+        activeInt = int(state)
+        payload = {'steamEn': activeInt}
+        await self.sauna.device_mutation(deviceId=self.id,payload=payload)
+
     async def set_active(self, state: bool):
         activeInt = int(state)
         payload = {'active': activeInt}
@@ -154,7 +185,7 @@ class HarviaDevice:
 
     async def dump_data(self):
 
-        data = { 'name': self.name, 'active': self.active, 'lightsOn': self.lightsOn,  'targetTemp': self.targetTemp,  'targetRh': self.targetRh, 'fanOn':  self.fanOn, 'heatUpTime': self.heatUpTime  }
+        data = { 'name': self.name, 'active': self.active, 'lightsOn': self.lightsOn, 'SteamOn': self.steamOn,  'targetTemp': self.targetTemp,  'targetRh': self.targetRh, 'fanOn':  self.fanOn, 'heatUpTime': self.heatUpTime  }
 
         attributes_as_string = json.dumps(data, indent=4)
         _LOGGER.debug(f"Device attributen: {attributes_as_string}")
@@ -171,6 +202,30 @@ class HarviaDevice:
 
         return self.binarySensors
 
+
+    async def get_sensors(self) -> list:
+
+        if self.sensors != None:
+            return self.sensors
+
+        self.sensors = []
+
+        humiditySensor = HarviaHumiditySensor(device=self, name=self.name, sauna=self.sauna)
+        self.sensors.append(humiditySensor)
+
+        return self.sensors
+
+    async def get_numbers(self) -> list:
+
+        if self.numbers != None:
+            return self.numbers
+
+        self.numbers = []
+
+        humidityNumber = HarviaHumiditySetPoint(device=self, name=self.name, sauna=self.sauna)
+        self.numbers.append(humidityNumber)
+
+        return self.numbers
 
     async def get_thermostats(self) -> list:
         if self.thermostats != None:
@@ -191,31 +246,52 @@ class HarviaDevice:
 
         powerSwitch = HarviaPowerSwitch(device=self, name=self.name, sauna=self.sauna)
         lightSwitch = HarviaLightSwitch(device=self, name=self.name, sauna=self.sauna)
+        steamerSwitch = HarviaSteamerSwitch(device=self, name=self.name, sauna=self.sauna)
         fanSwitch = HarviaFanSwitch(device=self, name=self.name, sauna=self.sauna)
-
 
         self.switches.append(powerSwitch)
         self.switches.append(lightSwitch)
+        self.switches.append(steamerSwitch)
         self.switches.append(fanSwitch)
-
 
         return self.switches
 
 
 class HarviaWebsock:
 
-    def __init__(self, sauna: HarviaSauna, endpoint: str):
+    def __init__(self, sauna: HarviaSauna, endpoint: str, user_receiver: bool = False):
         self.sauna = sauna
         self.websocket = None
         self.timeout = 300
+        self.reconnect_interval = 1800  # Herstelinterval in seconden
         self.endpoint = endpoint
         self.endpoint_host = None
         self.reconnect_attempts = 0
         self.uuid = None
+        self.user_receiver = user_receiver
         self.websocket_task = None
+        self.disconnect_task = None  # Toegevoegde taak voor periodiek verbreken
+
 
     async def connect(self):
         self.websocket_task = asyncio.create_task(self.start())
+        self.disconnect_task = asyncio.create_task(self.disconnect_periodically())  # Start de periodieke disconnectie
+
+    async def disconnect_periodically(self):
+        while True:
+            await asyncio.sleep(self.reconnect_interval)
+            if self.websocket:
+                payload = {
+                    "id": self.uuid,
+                    "type": "stop"
+                }
+                await self.websocket.send(json.dumps(payload))
+                await self.websocket.close()
+                _LOGGER.debug("WebSocket is gesloten om opnieuw te verbinden.")
+                self.websocket = None
+                self.websocket_task.cancel()
+                self.websocket_task = asyncio.create_task(self.start())
+
 
     async def start(self):
         """Probeer opnieuw verbinding te maken in geval van verbreking."""
@@ -279,18 +355,23 @@ class HarviaWebsock:
 
     async def create_data_subscription_message(self) -> str:
         userData = await self.sauna.get_user_data()
-        organizationId = userData["organizationId"]
-        return "{\"query\":\"subscription Subscription($receiver: String!) {\\n  onDataUpdates(receiver: $receiver) {\\n    item {\\n      deviceId\\n      timestamp\\n      sessionId\\n      type\\n      data\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\""+organizationId+"\"}}"
+        if not self.user_receiver:
+            receiver = userData["organizationId"]
+        else:
+            receiver =  userData["email"]
+        return "{\"query\":\"subscription Subscription($receiver: String!) {\\n  onDataUpdates(receiver: $receiver) {\\n    item {\\n      deviceId\\n      timestamp\\n      sessionId\\n      type\\n      data\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\""+receiver+"\"}}"
 
     async def create_device_subscription_message(self) -> str:
         userData = await self.sauna.get_user_data()
-        organizationId = userData["organizationId"]
-        return "{\"query\":\"subscription Subscription($receiver: String!) {\\n  onStateUpdated(receiver: $receiver) {\\n    desired\\n    reported\\n    timestamp\\n    receiver\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\""+organizationId+"\"}}"
+        if not self.user_receiver:
+            receiver = userData["organizationId"]
+        else:
+            receiver =  userData["email"]
+        return "{\"query\":\"subscription Subscription($receiver: String!) {\\n  onStateUpdated(receiver: $receiver) {\\n    desired\\n    reported\\n    timestamp\\n    receiver\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"receiver\":\""+receiver+"\"}}"
 
     async def handle_message(self, message):
         """Verwerk en reageer op het ontvangen bericht."""
-
-        _LOGGER.debug("Websock " + self.endpoint +  " - received message: " + message)
+        _LOGGER.debug("Websock " + self.endpoint +  " (User receveiver: " + str(self.user_receiver) + ") - received message: " + message)
         data = json.loads(message)  # Veronderstelt dat het bericht in JSON-formaat is
         # Voorbeeld: controleer of het bericht een specifiek type of inhoud heeft
         if data.get("type") == "ka":
@@ -301,11 +382,11 @@ class HarviaWebsock:
                 self.timeout = data['payload']['connectionTimeoutMs']/1000
             await self.create_subscription()
         elif data.get("type") == "data":
+            _LOGGER.debug("Websock " + self.endpoint +  " data message receiver: " + message)
             if self.endpoint == 'device':
                 await self.sauna.process_device_update(data)
             elif self.endpoint == 'data':
                 await self.sauna.process_device_update(data)
-            _LOGGER.debug("Websock " + self.endpoint +  " Actie vereist: " + message)
         else:
             _LOGGER.debug("Onbekend berichttype " + self.endpoint +  " ontvangen: " + message)
 
@@ -331,6 +412,8 @@ class HarviaSauna:
         self.cognito = None
         self.websockDevice = None
         self.websockData = None
+        self.websockDeviceUser = None
+        self.websockDataUser = None
         self.api = None
 
     async def async_setup(self, config: dict) -> bool:
@@ -482,9 +565,17 @@ class HarviaSauna:
                 self.websockDevice = HarviaWebsock(self, 'device')
                 await self.websockDevice.connect()
 
+            if self.websockDeviceUser is None:
+                self.websockDeviceUser = HarviaWebsock(self, 'device', True)
+                await self.websockDeviceUser.connect()
+
             if self.websockData is None:
                 self.websockData = HarviaWebsock(self, 'data')
                 await self.websockData.connect()
+
+            if self.websockDataUser is None:
+                self.websockDataUser = HarviaWebsock(self, 'data', True)
+                await self.websockDataUser.connect()
 
             if self.websockDevice and self.websockDevice.websocket_task.done():
                 _LOGGER.debug("WebSocket Device: NOT RUNNING. Reconnecting!")
@@ -492,11 +583,24 @@ class HarviaSauna:
             else:
                 _LOGGER.debug("\tWebsocket Device: RUNNING")
 
+            if self.websockDeviceUser and self.websockDeviceUser.websocket_task.done():
+                _LOGGER.debug("WebSocket Device  (user): NOT RUNNING. Reconnecting!")
+                await self.websockDeviceUser.connect()
+            else:
+                _LOGGER.debug("\tWebsocket Device  (user): RUNNING")
+
             if self.websockData and self.websockData.websocket_task.done():
                 _LOGGER.debug("\tWebSocket Data: NOT RUNNING. Reconnecting!")
                 await self.websockData.connect()
             else:
                 _LOGGER.debug("\tWebsocket Data: RUNNING")
+
+            if self.websockDataUser and self.websockDataUser.websocket_task.done():
+                _LOGGER.debug("\tWebSocket Data (user): NOT RUNNING. Reconnecting!")
+                await self.websockDataUser.connect()
+            else:
+                _LOGGER.debug("\tWebsocket Data  (user): RUNNING")
+
             await asyncio.sleep(60)
 
 
