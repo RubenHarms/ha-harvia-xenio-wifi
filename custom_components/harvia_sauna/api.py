@@ -124,7 +124,7 @@ class HarviaSaunaAPI:
 
     async def endpoint(self, endpoint: str, query: dict) -> dict:
         headers = await self.getHeaders()
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        session = async_get_clientsession(self.hass)
         url = self.endpoints[endpoint]['endpoint']
         queryDump = json.dumps(query, indent=4)
         _LOGGER.debug("Endpoint request on '" + url + "':")
