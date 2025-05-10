@@ -6,7 +6,7 @@ import re
 import base64
 import botocore.exceptions
 from urllib.parse import quote
-
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .constants import DOMAIN, REGION
 
@@ -27,7 +27,7 @@ class HarviaSaunaAPI:
 
         if self.endpoints is None:
             self.endpoints = {}
-            session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+            session = async_get_clientsession(self.hass)
             endpoints = ["users", "device", "events", "data"]
             for endpoint in endpoints:
                 url = f'https://prod.myharvia-cloud.net/{endpoint}/endpoint'
@@ -124,7 +124,7 @@ class HarviaSaunaAPI:
 
     async def endpoint(self, endpoint: str, query: dict) -> dict:
         headers = await self.getHeaders()
-        session = self.hass.helpers.aiohttp_client.async_get_clientsession()
+        session = async_get_clientsession(self.hass)
         url = self.endpoints[endpoint]['endpoint']
         queryDump = json.dumps(query, indent=4)
         _LOGGER.debug("Endpoint request on '" + url + "':")
