@@ -626,9 +626,7 @@ async def async_setup_entry(hass, entry):
     storage = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     harvia_sauna = HarviaSauna(hass, storage, entry)
     await harvia_sauna.async_setup(entry)
-
-    for entity_type in ENTITY_TYPES:
-        hass.async_create_task(  hass.config_entries.async_forward_entry_setup(entry, entity_type) )
+    await hass.config_entries.async_forward_entry_setups(entry, ENTITY_TYPES)
 
     return True
 
